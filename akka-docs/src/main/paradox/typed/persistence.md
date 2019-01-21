@@ -3,6 +3,7 @@
 @@@ index
 
 * [Persistence - coding style](persistence-style.md)
+* [Persistence - snapshotting](persistence-snapshot.md)
 
 @@@
 
@@ -81,11 +82,13 @@ are executed sequentially after successful execution of the persist statement (o
 
 When an event has been persisted successfully the new state is created by applying the event to the current state with the `eventHandler`.
 
-The event handler returns the new state, which must be immutable so you return a new instance of the state.
+The state is typically immutable and then the event handler returns a new instance of the state. If the state is
+mutable the event handler may update the state instance and return the same instance.
+
 The same event handler is also used when the entity is started up to recover its state from the stored events.
 
-It is not recommended to perform side effects
-in the event handler, as those are also executed during recovery of an persistent actor
+It is not recommended to perform side effects in the event handler, as those are also executed during recovery of
+an persistent actor
 
 ## Basic example
 
@@ -351,6 +354,8 @@ Java
 The `onRecoveryCompleted` takes @scala[an `ActorContext` and] the current `State`,
 and doesn't return anything.
 
+@ref[Snapshots)[persistence-snapshot.md] can be used for optimizing recovery times.
+
 ## Tagging
 
 Persistence typed allows you to use event tags without using @ref[`EventAdapter`](../persistence.md#event-adapters):
@@ -413,4 +418,3 @@ Java
 Journals can reject events. The difference from a failure is that the journal must decide to reject an event before
 trying to persist it e.g. because of a serialization exception. If an event is rejected it definitely won't be in the journal. 
 This is signalled to a `EventSourcedBehavior` via a `EventRejectedException` and can be handled with a @ref[supervisor](fault-tolerance.md). 
-

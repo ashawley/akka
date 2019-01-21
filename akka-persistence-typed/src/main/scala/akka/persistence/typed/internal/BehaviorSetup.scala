@@ -115,6 +115,7 @@ object MDC {
   val ReplayingEvents   = "replay-evts"
   val RunningCmds       = "running-cmnds"
   val PersistingEvents  = "persist-evts"
+  val StoringSnapshot  = "storing-snapshot"
   // format: ON
 
   def create(persistenceId: PersistenceId, phaseName: String): Map[String, Any] = {

@@ -153,7 +153,7 @@ object EventSourcedBehaviorSpec {
 
         case cmd: IncrementWithConfirmation ⇒
           Effect.persist(Incremented(1))
-            .thenReply(cmd)(newState ⇒ Done)
+            .thenReply(cmd)(_ ⇒ Done)
 
         case GetValue(replyTo) ⇒
           replyTo ! state
@@ -656,7 +656,7 @@ class EventSourcedBehaviorSpec extends ScalaTestWithActorTestKit(EventSourcedBeh
         ctx.watch(toWatch)
         Behaviors.receive[Any] { (_, _) ⇒ Behaviors.same }
           .receiveSignal {
-            case (_, s: Terminated) ⇒
+            case (_, _: Terminated) ⇒
               probe.ref ! "Terminated"
               Behaviors.stopped
           }

@@ -75,6 +75,7 @@ private[akka] object Running {
 
   private val runningCmdsMdc = MDC.create(setup.persistenceId, MDC.RunningCmds)
   private val persistingEventsMdc = MDC.create(setup.persistenceId, MDC.PersistingEvents)
+  private val storingSnapshotMdc = MDC.create(setup.persistenceId, MDC.StoringSnapshot)
 
   def handlingCommands(state: EventsourcedState[S]): Behavior[InternalProtocol] = {
 
@@ -159,8 +160,10 @@ private[akka] object Running {
 
     Behaviors.receiveMessage[InternalProtocol] {
       case IncomingCommand(c: C @unchecked) ⇒ onCommand(state, c)
-      case SnapshotterResponse(r)           ⇒ onSnapshotterResponse(r, Behaviors.same)
-      case _                                ⇒ Behaviors.unhandled
+      case SnapshotterResponse(r) ⇒
+        setup.log.warning("Unexpected SnapshotterResponse {}", r)
+        Behaviors.unhandled
+      case _ ⇒ Behaviors.unhandled
     }.receiveSignal {
       case (_, PoisonPill) ⇒
         if (isStashEmpty) Behaviors.stopped
@@ -181,7 +184,7 @@ private[akka] object Running {
     new PersistingEvents(state, numberOfEvents, shouldSnapshotAfterPersist, sideEffects)
   }
 
-  class PersistingEvents(
+  private[akka] class PersistingEvents(
     var state:                  EventsourcedState[S],
     numberOfEvents:             Int,
     shouldSnapshotAfterPersist: Boolean,
@@ -192,11 +195,13 @@ private[akka] object Running {
 
     override def onMessage(msg: InternalProtocol): Behavior[InternalProtocol] = {
       msg match {
-        case SnapshotterResponse(r)            ⇒ onSnapshotterResponse(r, this)
         case JournalResponse(r)                ⇒ onJournalResponse(r)
         case in: IncomingCommand[C @unchecked] ⇒ onCommand(in)
-        case RecoveryTickEvent(_)              ⇒ Behaviors.unhandled
-        case RecoveryPermitGranted             ⇒ Behaviors.unhandled
+        case SnapshotterResponse(r) ⇒
+          setup.log.warning("Unexpected SnapshotterResponse {}", r)
+          Behaviors.unhandled
+        case RecoveryTickEvent(_)  ⇒ Behaviors.unhandled
+        case RecoveryPermitGranted ⇒ Behaviors.unhandled
       }
     }
 
@@ -222,10 +227,11 @@ private[akka] object Running {
         // only once all things are applied we can revert back
         if (eventCounter < numberOfEvents) this
         else {
-          if (shouldSnapshotAfterPersist)
+          if (shouldSnapshotAfterPersist && state.state != null) {
             internalSaveSnapshot(state)
-
-          tryUnstash(applySideEffects(sideEffects, state))
+            storingSnapshot(state, sideEffects)
+          } else
+            tryUnstash(applySideEffects(sideEffects, state))
         }
       }
 
@@ -268,27 +274,57 @@ private[akka] object Running {
 
   }
 
-  private def onSnapshotterResponse(
-    response: SnapshotProtocol.Response,
-    outer:    Behavior[InternalProtocol]): Behavior[InternalProtocol] = {
-    response match {
-      case SaveSnapshotSuccess(meta) ⇒
-        setup.onSnapshot(meta, Success(Done))
-        outer
-      case SaveSnapshotFailure(meta, ex) ⇒
-        setup.onSnapshot(meta, Failure(ex))
-        outer
+  // ===============================================
 
-      // FIXME not implemented
-      case DeleteSnapshotFailure(_, _)  ⇒ ???
-      case DeleteSnapshotSuccess(_)     ⇒ ???
-      case DeleteSnapshotsFailure(_, _) ⇒ ???
-      case DeleteSnapshotsSuccess(_)    ⇒ ???
+  def storingSnapshot(
+    state:       EventsourcedState[S],
+    sideEffects: immutable.Seq[SideEffect[S]]
+  ): Behavior[InternalProtocol] = {
+    setup.setMdc(storingSnapshotMdc)
 
-      // ignore LoadSnapshot messages
+    def onCommand(cmd: IncomingCommand[C]): Behavior[InternalProtocol] = {
+      if (state.receivedPoisonPill) {
+        if (setup.settings.logOnStashing) setup.log.debug(
+          "Discarding message [{}], because actor is to be stopped", cmd)
+        Behaviors.unhandled
+      } else {
+        stash(cmd)
+        storingSnapshot(state, sideEffects)
+      }
+    }
+
+    def onSnapshotterResponse(response: SnapshotProtocol.Response): Unit = {
+      response match {
+        case SaveSnapshotSuccess(meta) ⇒
+          setup.onSnapshot(meta, Success(Done))
+        case SaveSnapshotFailure(meta, ex) ⇒
+          setup.onSnapshot(meta, Failure(ex))
+
+        // FIXME not implemented
+        case DeleteSnapshotFailure(_, _)  ⇒ ???
+        case DeleteSnapshotSuccess(_)     ⇒ ???
+        case DeleteSnapshotsFailure(_, _) ⇒ ???
+        case DeleteSnapshotsSuccess(_)    ⇒ ???
+
+        // ignore LoadSnapshot messages
+        case _                            ⇒
+      }
+    }
+
+    Behaviors.receiveMessage[InternalProtocol] {
+      case cmd: IncomingCommand[C] @unchecked ⇒
+        onCommand(cmd)
+      case SnapshotterResponse(r) ⇒
+        onSnapshotterResponse(r)
+        tryUnstash(applySideEffects(sideEffects, state))
       case _ ⇒
         Behaviors.unhandled
+    }.receiveSignal {
+      case (_, PoisonPill) ⇒
+        // wait for snapshot response before stopping
+        storingSnapshot(state.copy(receivedPoisonPill = true), sideEffects)
     }
+
   }
 
   // --------------------------
@@ -324,3 +360,4 @@ private[akka] object Running {
   }
 
 }
+
