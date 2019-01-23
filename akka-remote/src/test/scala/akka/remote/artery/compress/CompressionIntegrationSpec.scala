@@ -325,7 +325,7 @@ class CompressionIntegrationSpec extends ArteryMultiNodeSpec(CompressionIntegrat
         remainingExpectedTableVersions = removeFirst(remainingExpectedTableVersions, lastTable.version)
       }
 
-      remainingExpectedTableVersions should be('empty)
+      remainingExpectedTableVersions should be(sym"empty")
       lastTable.version.toInt should be <= upToNTablesAcceptedAfterWrap // definitely, since we expected to wrap around and start from 0 again
     }
   }

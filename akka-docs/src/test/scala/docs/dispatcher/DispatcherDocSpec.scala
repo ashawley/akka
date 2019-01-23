@@ -229,16 +229,16 @@ object DispatcherDocSpec {
       // Create a new PriorityGenerator, lower prio means more important
       PriorityGenerator {
         // 'highpriority messages should be treated first if possible
-        case 'highpriority ⇒ 0
+        case sym"highpriority" ⇒ 0
 
         // 'lowpriority messages should be treated last if possible
-        case 'lowpriority  ⇒ 2
+        case sym"lowpriority"  ⇒ 2
 
         // PoisonPill when no other left
-        case PoisonPill    ⇒ 3
+        case PoisonPill        ⇒ 3
 
         // We default to 1, which is in between high and low
-        case otherwise     ⇒ 1
+        case otherwise         ⇒ 1
       })
   //#prio-mailbox
 
@@ -360,13 +360,13 @@ class DispatcherDocSpec extends AkkaSpec(DispatcherDocSpec.config) {
       class Logger extends Actor {
         val log: LoggingAdapter = Logging(context.system, this)
 
-        self ! 'lowpriority
-        self ! 'lowpriority
-        self ! 'highpriority
-        self ! 'pigdog
-        self ! 'pigdog2
-        self ! 'pigdog3
-        self ! 'highpriority
+        self ! sym"lowpriority"
+        self ! sym"lowpriority"
+        self ! sym"highpriority"
+        self ! sym"pigdog"
+        self ! sym"pigdog2"
+        self ! sym"pigdog3"
+        self ! sym"highpriority"
         self ! PoisonPill
 
         def receive = {
@@ -401,8 +401,8 @@ class DispatcherDocSpec extends AkkaSpec(DispatcherDocSpec.config) {
       class Logger extends Actor {
         val log: LoggingAdapter = Logging(context.system, this)
 
-        self ! 'foo
-        self ! 'bar
+        self ! sym"foo"
+        self ! sym"bar"
         self ! MyControlMessage
         self ! PoisonPill
 

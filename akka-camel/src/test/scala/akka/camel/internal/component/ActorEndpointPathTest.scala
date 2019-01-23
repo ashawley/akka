@@ -16,7 +16,7 @@ class ActorEndpointPathTest extends WordSpec with SharedCamelSystem with Matcher
 
   "findActorIn returns Some(actor ref) if actor exists" in {
     val path = system.actorOf(Props(new Actor { def receive = { case _ ⇒ } }), "knownactor").path
-    find(path.toString) should be('defined)
+    find(path.toString) should be(sym"defined")
   }
 
   "findActorIn returns None" when {

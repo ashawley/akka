@@ -20,10 +20,10 @@ class ActorComponentConfigurationTest extends WordSpec with Matchers with Shared
     val actorEndpointConfig = component.createEndpoint(s"akka://test/user/$$a?autoAck=false&replyTimeout=987000000+nanos").asInstanceOf[ActorEndpointConfig]
 
     actorEndpointConfig should have(
-      'endpointUri(s"akka://test/user/$$a?autoAck=false&replyTimeout=987000000+nanos"),
-      'path(ActorEndpointPath.fromCamelPath(s"akka://test/user/$$a")),
-      'autoAck(false),
-      'replyTimeout(987000000 nanos))
+      sym"endpointUri"(s"akka://test/user/$$a?autoAck=false&replyTimeout=987000000+nanos"),
+      sym"path"(ActorEndpointPath.fromCamelPath(s"akka://test/user/$$a")),
+      sym"autoAck"(false),
+      sym"replyTimeout"(987000000 nanos))
   }
 
 }

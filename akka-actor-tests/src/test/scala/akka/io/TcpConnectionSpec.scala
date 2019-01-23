@@ -1098,7 +1098,7 @@ class TcpConnectionSpec extends AkkaSpec("""
     def assertThisConnectionActorTerminated(): Unit = {
       watch(connectionActor)
       expectTerminated(connectionActor)
-      clientSideChannel should not be ('open)
+      clientSideChannel should not be (sym"open")
     }
 
     def selectedAs(interest: Int, duration: Duration): BeMatcher[SelectionKey] =

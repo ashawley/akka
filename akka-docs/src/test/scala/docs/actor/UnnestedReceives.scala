@@ -29,16 +29,16 @@ class UnnestedReceives extends Actor {
   override def preStart: Unit = {
     //We override preStart to be sure that the first message the actor gets is
     //'Replay, that message will start to be processed _after_ the actor is started
-    self ! 'Replay
+    self ! sym"Replay"
     //Then we subscribe to the stream of messages/events
     subscribe()
   }
 
   def receive = {
-    case 'Replay ⇒ //Our first message should be a 'Replay message, all others are invalid
+    case sym"Replay" ⇒ //Our first message should be a 'Replay message, all others are invalid
       allOldMessages() foreach process //Process all old messages/events
       become { //Switch behavior to look for the GoAhead signal
-        case 'GoAhead ⇒ //When we get the GoAhead signal we process all our buffered messages/events
+        case sym"GoAhead" ⇒ //When we get the GoAhead signal we process all our buffered messages/events
           queue foreach process
           queue.clear
           become { //Then we change behavior to process incoming messages/events as they arrive
